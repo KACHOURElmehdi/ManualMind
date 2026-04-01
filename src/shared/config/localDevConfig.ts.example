@@ -1,0 +1,16 @@
+import type { LocalDevConfig } from "./localDevConfig.types";
+
+export const localDevConfig: LocalDevConfig = {
+  openRouter: {
+    // Paste your key here in your LOCAL file only.
+    // Do not commit secrets.
+    apiKey: "sk-or-v1-REPLACE_ME",
+    model: "qwen/qwen3.6-plus-preview:free",
+    baseUrl: "https://openrouter.ai/api/v1",
+    appTitle: "Study Assistant Extension (Local)",
+    // Optional: set to your local project URL (or keep empty string).
+    httpReferer: "",
+    temperature: 0.2,
+    maxTokens: 700
+  }
+};

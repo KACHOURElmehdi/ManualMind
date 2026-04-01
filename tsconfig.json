@@ -13,7 +13,11 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["chrome", "vite/client"]
+    "types": ["chrome", "vite/client", "node"],
+    "baseUrl": ".",
+    "paths": {
+      "@local-dev-config": ["src/shared/config/localDevConfig.fallback.ts"]
+    }
   },
   "include": ["src", "vite.config.ts"]
 }

@@ -106,6 +106,7 @@ export function App() {
       setTranscriptResult(null);
       setTranscriptAnalysis(null);
       addLog(`Extraction complete using ${extractResponse.data.strategy}.`);
+      addLog(`Text analysis request started (provider=${settings.analysisProvider}).`);
 
       const analysisResponse = await sendRuntimeRequest<AnalysisResult>({
         type: "ANALYZE_TEXT_QUESTION",
@@ -119,7 +120,7 @@ export function App() {
       }
 
       setTextAnalysis(analysisResponse.data);
-      addLog("Text analysis completed.");
+      addLog(`Text analysis completed (source=${analysisResponse.data.source}).`);
     } catch (requestError) {
       const message =
         requestError instanceof Error ? requestError.message : "Failed to analyze page question.";
@@ -164,14 +165,29 @@ export function App() {
       }
 
       setTranscriptResult(transcriptResponse.data);
-      setExtractedQuestion(null);
       setTextAnalysis(null);
       addLog("Mock transcription complete.");
+      addLog(`Transcript analysis request started (provider=${settings.analysisProvider}).`);
 
       const analysisResponse = await sendRuntimeRequest<AnalysisResult>({
         type: "ANALYZE_TRANSCRIPT",
         payload: {
-          transcript: transcriptResponse.data.transcript
+          transcript: transcriptResponse.data.transcript,
+          ...(extractedQuestion?.questionText
+            ? {
+                questionText: extractedQuestion.questionText
+              }
+            : {}),
+          ...(extractedQuestion?.options
+            ? {
+                options: extractedQuestion.options
+              }
+            : {}),
+          ...(extractedQuestion?.contextText
+            ? {
+                contextText: extractedQuestion.contextText
+              }
+            : {})
         }
       });
 
@@ -180,7 +196,7 @@ export function App() {
       }
 
       setTranscriptAnalysis(analysisResponse.data);
-      addLog("Transcript analysis completed.");
+      addLog(`Transcript analysis completed (source=${analysisResponse.data.source}).`);
     } catch (recordingError) {
       const message =
         recordingError instanceof Error ? recordingError.message : "Failed to process recording.";
@@ -222,6 +238,33 @@ export function App() {
       const message = settingsError instanceof Error ? settingsError.message : "Unable to save debug mode.";
       setError(message);
       addLog(`Debug mode update failed: ${message}`);
+    }
+  };
+
+  const handleAnalysisProviderChange = async (
+    value: ExtensionSettings["analysisProvider"]
+  ): Promise<void> => {
+    setError(null);
+    try {
+      await persistSettings({ analysisProvider: value });
+      addLog(`Analysis provider set to ${value}.`);
+    } catch (settingsError) {
+      const message = settingsError instanceof Error ? settingsError.message : "Unable to save analysis provider.";
+      setError(message);
+      addLog(`Analysis provider update failed: ${message}`);
+    }
+  };
+
+  const handleFallbackToggle = async (checked: boolean): Promise<void> => {
+    setError(null);
+    try {
+      await persistSettings({ fallbackToMockOnProviderError: checked });
+      addLog(`Fallback-to-mock ${checked ? "enabled" : "disabled"}.`);
+    } catch (settingsError) {
+      const message =
+        settingsError instanceof Error ? settingsError.message : "Unable to save fallback setting.";
+      setError(message);
+      addLog(`Fallback setting update failed: ${message}`);
     }
   };
 
@@ -283,6 +326,19 @@ export function App() {
           </select>
         </label>
 
+        <label className="field">
+          <span>Analysis provider</span>
+          <select
+            value={settings.analysisProvider}
+            onChange={(event) =>
+              void handleAnalysisProviderChange(event.target.value as ExtensionSettings["analysisProvider"])
+            }
+          >
+            <option value="mock">mock</option>
+            <option value="openrouter">openrouter</option>
+          </select>
+        </label>
+
         <label className="toggle">
           <input
             type="checkbox"
@@ -290,6 +346,15 @@ export function App() {
             onChange={(event) => void handleDebugModeToggle(event.target.checked)}
           />
           <span>Debug mode (show parser annotations and extra logs)</span>
+        </label>
+
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={settings.fallbackToMockOnProviderError}
+            onChange={(event) => void handleFallbackToggle(event.target.checked)}
+          />
+          <span>Fallback to mock when provider request fails</span>
         </label>
 
         <label className="field">
@@ -343,12 +408,23 @@ export function App() {
         <h2>Suggested answer</h2>
         <p>{latestAnalysis?.suggestedAnswer ?? "No answer suggestion yet."}</p>
         {latestAnalysis ? <p className="muted">Confidence: {formatConfidence(latestAnalysis.confidence)}</p> : null}
+        {latestAnalysis ? <p className="muted">Source: {latestAnalysis.source}</p> : null}
       </section>
 
       <section className="result-card">
         <h2>Explanation</h2>
         <p>{latestAnalysis?.explanation ?? "No explanation yet."}</p>
         {latestAnalysis ? <p className="muted">{latestAnalysis.safetyNotice}</p> : null}
+      </section>
+
+      <section className="result-card">
+        <h2>Likely problem</h2>
+        <p>{latestAnalysis?.likelyProblem ?? "No likely problem provided."}</p>
+      </section>
+
+      <section className="result-card">
+        <h2>Recommended next step</h2>
+        <p>{latestAnalysis?.recommendedNextStep ?? "No recommended next step provided."}</p>
       </section>
 
       <section className="result-card">

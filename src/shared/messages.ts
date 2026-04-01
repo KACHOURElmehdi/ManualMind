@@ -24,6 +24,9 @@ export type ExtensionRequest =
       type: "ANALYZE_TRANSCRIPT";
       payload: {
         transcript: string;
+        questionText?: string;
+        options?: ExtractedQuestion["options"];
+        contextText?: string;
       };
     }
   | {

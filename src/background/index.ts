@@ -1,6 +1,7 @@
 import { getAnalysisProvider } from "../shared/analysis/providerFactory";
 import { errorResponse, isExtensionRequest, successResponse, type MessageResponse } from "../shared/messages";
 import { getSettings, updateSettings } from "../shared/storage/settingsStorage";
+import type { AnalysisResult } from "../shared/types";
 
 interface ActiveTabContext {
   id: number;
@@ -98,8 +99,6 @@ async function handleMessage(message: unknown): Promise<MessageResponse<unknown>
     return errorResponse("BAD_REQUEST", "Invalid request payload.");
   }
 
-  const provider = getAnalysisProvider();
-
   try {
     switch (message.type) {
       case "GET_SETTINGS": {
@@ -142,16 +141,43 @@ async function handleMessage(message: unknown): Promise<MessageResponse<unknown>
         }
       }
       case "ANALYZE_TEXT_QUESTION": {
-        const result = await provider.analyzeTextQuestion(message.payload.input);
-        return successResponse(result);
+        const settings = await getSettings();
+        const provider = getAnalysisProvider(settings.analysisProvider);
+
+        try {
+          const result = await provider.analyzeTextQuestion(message.payload.input);
+          return successResponse(result);
+        } catch (error) {
+          if (settings.analysisProvider === "openrouter" && settings.fallbackToMockOnProviderError) {
+            return runTextFallback(message.payload.input, error);
+          }
+          return providerErrorResponse(error, "Text analysis request failed.");
+        }
       }
       case "TRANSCRIBE_AUDIO_BLOB": {
-        const transcript = await provider.transcribeAudio(message.payload.audioBlob);
-        return successResponse(transcript);
+        const settings = await getSettings();
+        const provider = getAnalysisProvider(settings.analysisProvider);
+
+        try {
+          const transcript = await provider.transcribeAudio(message.payload.audioBlob);
+          return successResponse(transcript);
+        } catch (error) {
+          return providerErrorResponse(error, "Audio transcription request failed.");
+        }
       }
       case "ANALYZE_TRANSCRIPT": {
-        const analysis = await provider.analyzeTranscript(message.payload.transcript);
-        return successResponse(analysis);
+        const settings = await getSettings();
+        const provider = getAnalysisProvider(settings.analysisProvider);
+
+        try {
+          const analysis = await provider.analyzeTranscript(message.payload);
+          return successResponse(analysis);
+        } catch (error) {
+          if (settings.analysisProvider === "openrouter" && settings.fallbackToMockOnProviderError) {
+            return runTranscriptFallback(message.payload, error);
+          }
+          return providerErrorResponse(error, "Transcript analysis request failed.");
+        }
       }
       default:
         return errorResponse("BAD_REQUEST", "Unsupported request type.");
@@ -170,3 +196,105 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 chrome.runtime.onInstalled.addListener(() => {
   void getSettings();
 });
+
+// Open side panel when extension icon is clicked
+chrome.action.onClicked.addListener((tab) => {
+  if (!tab.id) {
+    console.error("No tab ID available");
+    return;
+  }
+
+  // Check if sidePanel API is available
+  if (chrome.sidePanel && chrome.sidePanel.open) {
+    chrome.sidePanel
+      .open({ tabId: tab.id })
+      .then(() => {
+        console.log("Side panel opened successfully");
+      })
+      .catch((error) => {
+        console.error("Failed to open side panel:", error);
+      });
+  } else {
+    console.error("Side Panel API not available. Check permissions and browser compatibility.");
+  }
+});
+
+function providerErrorResponse(error: unknown, fallbackMessage: string): MessageResponse<never> {
+  if (error instanceof Error) {
+    return errorResponse("PROVIDER_ERROR", fallbackMessage, error.message);
+  }
+
+  return errorResponse("PROVIDER_ERROR", fallbackMessage);
+}
+
+async function runTextFallback(
+  input: {
+    questionText: string;
+    options: { id: string; text: string }[];
+    contextText: string;
+    rawText: string;
+  },
+  originalError: unknown
+): Promise<MessageResponse<AnalysisResult>> {
+  try {
+    const mockProvider = getAnalysisProvider("mock");
+    const fallbackResult = await mockProvider.analyzeTextQuestion(input);
+    const withFallbackInfo: AnalysisResult = {
+      ...fallbackResult,
+      source: "mock-fallback-after-openrouter-error",
+      explanation: `${fallbackResult.explanation} OpenRouter error: ${errorToMessage(originalError)}`
+    };
+
+    return successResponse(withFallbackInfo);
+  } catch (fallbackError) {
+    const details = [
+      `primary=${errorToMessage(originalError)}`,
+      `fallback=${errorToMessage(fallbackError)}`
+    ].join(" | ");
+    return errorResponse(
+      "PROVIDER_ERROR",
+      "Text analysis failed in both OpenRouter and mock fallback paths.",
+      details
+    );
+  }
+}
+
+async function runTranscriptFallback(
+  input: {
+    transcript: string;
+    questionText?: string;
+    options?: { id: string; text: string }[];
+    contextText?: string;
+  },
+  originalError: unknown
+): Promise<MessageResponse<AnalysisResult>> {
+  try {
+    const mockProvider = getAnalysisProvider("mock");
+    const fallbackResult = await mockProvider.analyzeTranscript(input);
+    const withFallbackInfo: AnalysisResult = {
+      ...fallbackResult,
+      source: "mock-fallback-after-openrouter-error",
+      explanation: `${fallbackResult.explanation} OpenRouter error: ${errorToMessage(originalError)}`
+    };
+
+    return successResponse(withFallbackInfo);
+  } catch (fallbackError) {
+    const details = [
+      `primary=${errorToMessage(originalError)}`,
+      `fallback=${errorToMessage(fallbackError)}`
+    ].join(" | ");
+    return errorResponse(
+      "PROVIDER_ERROR",
+      "Transcript analysis failed in both OpenRouter and mock fallback paths.",
+      details
+    );
+  }
+}
+
+function errorToMessage(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  return "Unknown provider error";
+}

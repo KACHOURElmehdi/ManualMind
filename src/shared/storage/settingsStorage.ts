@@ -1,14 +1,17 @@
-import type { ExtensionSettings, ParserMode } from "../types";
+import type { AnalysisProviderMode, ExtensionSettings, ParserMode } from "../types";
 
 const STORAGE_KEY = "studyAssistantSettings";
 
 export const DEFAULT_SETTINGS: ExtensionSettings = {
-  enabledSites: ["https://example.com/*"],
+  enabledSites: ["https://example.com/*", "https://*.7speaking.com/*"],
   debugMode: false,
-  preferredParserMode: "auto"
+  preferredParserMode: "auto",
+  analysisProvider: "mock",
+  fallbackToMockOnProviderError: true
 };
 
 const PARSER_MODES = new Set<ParserMode>(["auto", "quiz", "aggressive"]);
+const ANALYSIS_PROVIDER_MODES = new Set<AnalysisProviderMode>(["mock", "openrouter"]);
 
 function sanitizeSettings(input: Partial<ExtensionSettings> | undefined): ExtensionSettings {
   const enabledSites = Array.isArray(input?.enabledSites)
@@ -22,10 +25,21 @@ function sanitizeSettings(input: Partial<ExtensionSettings> | undefined): Extens
     ? (input?.preferredParserMode as ParserMode)
     : DEFAULT_SETTINGS.preferredParserMode;
 
+  const analysisProvider = ANALYSIS_PROVIDER_MODES.has(input?.analysisProvider as AnalysisProviderMode)
+    ? (input?.analysisProvider as AnalysisProviderMode)
+    : DEFAULT_SETTINGS.analysisProvider;
+
+  const fallbackToMockOnProviderError =
+    typeof input?.fallbackToMockOnProviderError === "boolean"
+      ? input.fallbackToMockOnProviderError
+      : DEFAULT_SETTINGS.fallbackToMockOnProviderError;
+
   return {
     enabledSites,
     debugMode,
-    preferredParserMode
+    preferredParserMode,
+    analysisProvider,
+    fallbackToMockOnProviderError
   };
 }
 

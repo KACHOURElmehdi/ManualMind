@@ -4,11 +4,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "dev": "vite build --watch",
+    "dev:hmr": "vite",
+    "build": "tsc --noEmit && vite build && npm run verify:dist",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\" \"vite.config.ts\"",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "verify:dist": "node scripts/check-dist-loader.mjs"
   },
   "dependencies": {
     "react": "^18.3.1",
@@ -17,6 +19,7 @@
   "devDependencies": {
     "@crxjs/vite-plugin": "latest",
     "@types/chrome": "^0.0.284",
+    "@types/node": "^22.13.0",
     "@types/react": "^18.3.2",
     "@types/react-dom": "^18.3.0",
     "@typescript-eslint/eslint-plugin": "^7.18.0",

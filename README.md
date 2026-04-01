@@ -1,40 +1,27 @@
 # Study Assistant Chrome Extension (MV3)
 
-Manual-assist Chrome extension scaffold for study/practice use on websites you own or have permission to use.
+Manual-review extension for study/practice on authorized sites.
 
-The extension only extracts visible content and provides suggestions in the side panel for manual review.
-It does **not** auto-select answers, auto-fill forms, submit forms, or simulate answering behavior.
+This project is still local extension-first:
+- no backend
+- no Docker
+- no auto-answering on page
 
-## Features
-- Text question mode
-  - Extract visible question text, options, and context from DOM
-  - Strategy-based parser (`quiz`, `form-like`, `generic`)
-  - Analyze extracted text via mock provider
-- Audio question mode
-  - Record microphone audio with `MediaRecorder`
-  - Deterministic mock transcription from audio blob metadata
-  - Analyze transcript and show suggestion + explanation + confidence
-- Side panel UI
-  - Sections for question, options, transcript, answer, explanation, raw text, debug logs
-- Settings via `chrome.storage`
-  - Enabled sites
-  - Debug mode
-  - Preferred parser mode
+It now supports **two analysis providers**:
+- `mock`
+- `openrouter` (for text/transcript analysis)
+
+Audio transcription stays mocked (`MediaRecorder` + mock transcript mapping).
 
 ## Safety Constraints
-- No auto-answering implementation
-- No auto-clicking, auto-filling, or form submission
-- No keyboard/mouse simulation for answering actions
-- No bypass logic for site protections, timers, or locks
+- No auto-clicking answers
+- No auto-filling inputs
+- No auto-submitting forms
+- No keyboard/mouse simulation
+- No stealth/bypass behavior
+- Manual review only in side panel
 
-## Tech Stack
-- Manifest V3
-- TypeScript (strict)
-- React (side panel)
-- Vite + `@crxjs/vite-plugin`
-- Chrome extension message passing + storage APIs
-
-## Project Tree
+## Project Structure (Relevant)
 ```text
 .
 ├── manifest.json
@@ -43,119 +30,126 @@ It does **not** auto-select answers, auto-fill forms, submit forms, or simulate 
 ├── sidepanel.html
 ├── tsconfig.json
 ├── vite.config.ts
-├── .eslintrc.cjs
+├── .gitignore
 ├── public/
-│   ├── icons/
-│   │   ├── icon16.png
-│   │   ├── icon32.png
-│   │   ├── icon48.png
-│   │   └── icon128.png
-│   └── mock/
-│       └── sample-quiz.html
+│   └── icons/
+│       ├── icon16.png
+│       ├── icon32.png
+│       ├── icon48.png
+│       └── icon128.png
 └── src/
     ├── background/
     │   └── index.ts
     ├── content/
-    │   ├── index.ts
     │   └── extraction/
-    │       ├── parser.ts
-    │       ├── strategies.ts
-    │       └── visibility.ts
     ├── sidepanel/
-    │   ├── App.tsx
-    │   ├── main.tsx
-    │   ├── styles.css
-    │   └── audio/
-    │       └── recorder.ts
+    │   └── App.tsx
     └── shared/
-        ├── messaging.ts
-        ├── messages.ts
         ├── types.ts
-        ├── analysis/
-        │   ├── mockProvider.ts
-        │   ├── providerFactory.ts
-        │   └── types.ts
-        ├── mock/
-        │   └── mockData.ts
-        └── storage/
-            └── settingsStorage.ts
+        ├── messages.ts
+        ├── storage/
+        │   └── settingsStorage.ts
+        ├── config/
+        │   ├── localDevConfig.fallback.ts
+        │   ├── localDevConfig.ts.example
+        │   └── localDevConfig.types.ts
+        └── analysis/
+            ├── mockProvider.ts
+            ├── openRouterProvider.ts
+            ├── providerFactory.ts
+            └── types.ts
 ```
 
-## Setup
-1. Install dependencies:
+## OpenRouter Local Config (Do Not Commit Secrets)
+1. Copy example file:
    ```bash
-   npm install
+   cp src/shared/config/localDevConfig.ts.example src/shared/config/localDevConfig.ts
    ```
-2. Start development:
-   ```bash
-   npm run dev
+   PowerShell:
+   ```powershell
+   Copy-Item src/shared/config/localDevConfig.ts.example src/shared/config/localDevConfig.ts
    ```
-3. Build production output:
-   ```bash
-   npm run build
-   ```
-4. Optional checks:
-   ```bash
-   npm run typecheck
-   npm run lint
-   ```
+2. Edit `src/shared/config/localDevConfig.ts` and set your key:
+   - `openRouter.apiKey`
+   - optional `httpReferer`
+   - optional `appTitle`
 
-## Load Unpacked Extension in Chrome
-1. Build first (`npm run build`).
-2. Open `chrome://extensions`.
-3. Enable **Developer mode**.
-4. Click **Load unpacked**.
-5. Select the `dist` folder created by Vite.
-6. Open the extension side panel and use the controls.
+`src/shared/config/localDevConfig.ts` is git-ignored and should never be committed.
 
-## Important Host Permission Note
-Current `manifest.json` host scope is conservative by default:
+If this file is missing, the app uses safe fallback config with empty key, and OpenRouter mode will fail gracefully.
 
-```json
-"host_permissions": ["https://example.com/*"]
+## Manifest Notes
+- MV3 compliant
+- toolbar `action` configured with icons/title
+- side panel configured
+- host permissions include:
+  - `https://openrouter.ai/*`
+  - `https://example.com/*` (replace with your authorized sites)
+
+## Install / Validate / Build
+```bash
+npm install
+npm run typecheck
+npm run lint
+npm run build
 ```
 
-Update both:
-- `host_permissions`
-- `content_scripts.matches`
+## Recommended Local Run Mode (No SW Registration Errors)
+- Use `npm run build` for static unpacked output.
+- Use `npm run dev` for watch rebuilds (also static output, safe for unpacked loading).
+- `npm run dev:hmr` is available, but it injects localhost dev worker behavior and is not recommended for stable unpacked loading.
+- `npm run build` now runs `verify:dist` to ensure `dist/service-worker-loader.js` is static.
 
-to domains you own or are explicitly authorized to use.
+## Load Unpacked in Chrome
+1. Open `chrome://extensions`
+2. Enable **Developer mode**
+3. Click **Load unpacked**
+4. Select: `D:\Ynov\M2\Extension lang\dist`
+5. If extension was already loaded, click **Reload** after each new build.
 
-## Text Flow (Manual)
-1. Open a permitted page with visible question content.
-2. In side panel, click **Analyze page question**.
-3. Extension extracts question/options/context and runs mock analysis.
-4. Review suggested answer, confidence, explanation, and raw extracted text.
+## Show Extension in Toolbar
+1. Click puzzle icon (Extensions menu)
+2. Find **Study Assistant (Manual Review)**
+3. Click pin icon
+4. Extension icon becomes visible in toolbar
 
-## Audio Flow (Manual)
-1. Click **Start recording**.
-2. Ask/read the question aloud.
-3. Click **Stop recording**.
-4. Extension performs deterministic mock transcription + transcript analysis.
-5. Review transcript and suggestion manually.
+## Switch Provider
+In side panel settings:
+- `Analysis provider`: `mock` or `openrouter`
+- `Fallback to mock when provider request fails`: on/off
 
-## Example Parser Logic for Sample Quiz DOM
-Use [`public/mock/sample-quiz.html`](public/mock/sample-quiz.html) as a local fixture.
+Recommended for local testing:
+- Start with `mock`
+- Then switch to `openrouter`
+- Keep fallback enabled for resilience
 
-The `quizStrategy` parser detects:
-- question container via selectors like `[data-question]`, `.quiz-question`, `.question`
-- question text from `.question-text` or heading/paragraph fallbacks
-- options from `li`, `label`, `.option`, `.choice`, role-based option elements
-- context from `.instructions`, `.context`, `.hint`
+## Test Flows
+### Text question flow
+1. Open an authorized page (matching manifest and content script scope)
+2. Open side panel
+3. Click **Analyze page question**
+4. Verify:
+   - question/options/context extracted
+   - suggested answer, explanation, confidence
+   - likely problem, recommended next step
+   - logs/debug history
 
-## Mock Providers
-- Text/audio mock data: `src/shared/mock/mockData.ts`
-- Provider contract: `src/shared/analysis/types.ts`
-- Current implementation: `src/shared/analysis/mockProvider.ts`
+### Audio flow
+1. Click **Start recording**
+2. Speak question
+3. Click **Stop recording**
+4. Verify:
+   - transcript is generated via mock transcription
+   - transcript analysis uses selected provider (`mock` or `openrouter`)
 
-No paid API is needed for this version.
-
-## Plug In Your Own Backend Later
-1. Create a new provider implementing:
-   - `analyzeTextQuestion(input)`
-   - `transcribeAudio(audioBlob)`
-   - `analyzeTranscript(transcript)`
-2. Swap provider returned by `getAnalysisProvider()` in:
-   - `src/shared/analysis/providerFactory.ts`
-3. Keep API keys out of source and extension bundle.
-   Use your backend as a secure proxy.
+## Troubleshooting
+- OpenRouter key missing:
+  - create `src/shared/config/localDevConfig.ts`
+  - set `openRouter.apiKey`
+- OpenRouter request error:
+  - check internet connectivity
+  - verify key/model in local config
+  - keep fallback-to-mock enabled
+- No extraction:
+  - confirm page URL is allowed in manifest and enabled sites setting
+  - reload extension after manifest changes

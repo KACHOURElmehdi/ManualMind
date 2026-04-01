@@ -1,6 +1,6 @@
 import type { AnalysisResult, QuestionOption, TranscriptResult } from "../types";
 import { SAMPLE_AUDIO_TRANSCRIPTS } from "../mock/mockData";
-import type { AnalysisProvider, TextQuestionInput } from "./types";
+import type { AnalysisProvider, TextQuestionInput, TranscriptAnalysisInput } from "./types";
 
 const SAFETY_NOTICE =
   "Manual-assist mode only. Verify all suggestions yourself. This extension never auto-fills answers or submits forms.";
@@ -31,15 +31,25 @@ function scoreOption(option: QuestionOption, question: string, context: string):
 function buildAnalysisResult(
   answer: string,
   confidence: number,
-  explanation: string
+  explanation: string,
+  likelyProblem?: string,
+  recommendedNextStep?: string
 ): AnalysisResult {
-  return {
+  const base = {
     suggestedAnswer: answer,
     confidence: clamp(confidence, 0, 1),
     explanation,
     safetyNotice: SAFETY_NOTICE,
     source: "mock-provider-v1"
   };
+
+  return likelyProblem || recommendedNextStep
+    ? {
+        ...base,
+        ...(likelyProblem ? { likelyProblem } : {}),
+        ...(recommendedNextStep ? { recommendedNextStep } : {})
+      }
+    : base;
 }
 
 export class MockAnalysisProvider implements AnalysisProvider {
@@ -111,13 +121,15 @@ export class MockAnalysisProvider implements AnalysisProvider {
     };
   }
 
-  async analyzeTranscript(transcript: string): Promise<AnalysisResult> {
-    const normalized = transcript.toLowerCase();
+  async analyzeTranscript(input: TranscriptAnalysisInput): Promise<AnalysisResult> {
+    const normalized = input.transcript.toLowerCase();
     if (!normalized.trim()) {
       return buildAnalysisResult(
         "No answer suggested",
         0.04,
-        "The transcript is empty, so no reliable suggestion can be made."
+        "The transcript is empty, so no reliable suggestion can be made.",
+        "Transcript may be silent or microphone permission was denied.",
+        "Record again in a quieter environment and confirm microphone access."
       );
     }
 
@@ -125,7 +137,9 @@ export class MockAnalysisProvider implements AnalysisProvider {
       return buildAnalysisResult(
         "HTTPS (HTTP Secure)",
         0.79,
-        "The transcript asks for the secure protocol used for web pages, which maps to HTTPS."
+        "The transcript asks for the secure protocol used for web pages, which maps to HTTPS.",
+        "Question asks for secure web protocol identification.",
+        "Confirm available options and pick HTTPS if present."
       );
     }
 
@@ -133,7 +147,9 @@ export class MockAnalysisProvider implements AnalysisProvider {
       return buildAnalysisResult(
         "Queue",
         0.82,
-        "FIFO behavior corresponds to a queue data structure."
+        "FIFO behavior corresponds to a queue data structure.",
+        "Question describes ordering semantics (FIFO).",
+        "Select the data structure option matching FIFO behavior."
       );
     }
 
@@ -141,14 +157,18 @@ export class MockAnalysisProvider implements AnalysisProvider {
       return buildAnalysisResult(
         "An additional verification factor (e.g., one-time code or hardware token)",
         0.74,
-        "Two-factor authentication combines a password with a second independent factor."
+        "Two-factor authentication combines a password with a second independent factor.",
+        "Question focuses on account security fundamentals.",
+        "Choose the option describing a second independent authentication factor."
       );
     }
 
     return buildAnalysisResult(
       "Insufficient signal for a specific answer",
       0.38,
-      "Mock transcript analysis could not match a known pattern. Use transcript text for manual review."
+      "Mock transcript analysis could not match a known pattern. Use transcript text for manual review.",
+      "Transcript content is ambiguous or lacks key terms.",
+      "Compare transcript terms against visible choices and re-run with clearer audio."
     );
   }
 }

@@ -3,3 +3,4 @@ dist/
 *.log
 
 .env
+src/shared/config/localDevConfig.ts

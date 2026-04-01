@@ -7,8 +7,15 @@ export interface TextQuestionInput {
   rawText: string;
 }
 
+export interface TranscriptAnalysisInput {
+  transcript: string;
+  questionText?: string;
+  options?: QuestionOption[];
+  contextText?: string;
+}
+
 export interface AnalysisProvider {
   analyzeTextQuestion(input: TextQuestionInput): Promise<AnalysisResult>;
   transcribeAudio(audioBlob: Blob): Promise<TranscriptResult>;
-  analyzeTranscript(transcript: string): Promise<AnalysisResult>;
+  analyzeTranscript(input: TranscriptAnalysisInput): Promise<AnalysisResult>;
 }

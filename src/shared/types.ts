@@ -1,4 +1,5 @@
 export type ParserMode = "auto" | "quiz" | "aggressive";
+export type AnalysisProviderMode = "mock" | "openrouter";
 
 export interface QuestionOption {
   id: string;
@@ -19,6 +20,8 @@ export interface AnalysisResult {
   suggestedAnswer: string;
   confidence: number;
   explanation: string;
+  likelyProblem?: string;
+  recommendedNextStep?: string;
   safetyNotice: string;
   source: string;
 }
@@ -34,4 +37,6 @@ export interface ExtensionSettings {
   enabledSites: string[];
   debugMode: boolean;
   preferredParserMode: ParserMode;
+  analysisProvider: AnalysisProviderMode;
+  fallbackToMockOnProviderError: boolean;
 }
