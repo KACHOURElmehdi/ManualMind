@@ -1,0 +1,29 @@
+{
+  "name": "mv3-study-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint \"src/**/*.{ts,tsx}\" \"*.{ts,cjs,mjs,js}\"",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@crxjs/vite-plugin": "latest",
+    "@types/chrome": "^0.0.284",
+    "@types/react": "^18.3.2",
+    "@types/react-dom": "^18.3.0",
+    "@typescript-eslint/eslint-plugin": "^7.18.0",
+    "@typescript-eslint/parser": "^7.18.0",
+    "@vitejs/plugin-react": "^4.3.1",
+    "eslint": "^8.57.0",
+    "typescript": "^5.6.2",
+    "vite": "^5.4.8"
+  }
+}
