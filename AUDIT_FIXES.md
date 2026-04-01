@@ -1,6 +1,6 @@
 # ManualMind Extension - Audit & Fixes Report
 
-## Date: 2026-04-01
+## Date: 2026-04-01 (Updated)
 
 ## Issues Found & Fixed
 
@@ -33,6 +33,18 @@ if (chrome.sidePanel && chrome.sidePanel.open) {
 ### ✅ 4. TypeScript Compilation
 **Status:** All TypeScript checks passing with no errors
 **Command:** `npm run typecheck` - ✅ Success
+
+### ✅ 5. TypeError: Cannot read properties of undefined (reading 'length')
+**Problem:** Side panel crashed when accessing `.length` on undefined arrays
+**Location:** `src/sidepanel/App.tsx`
+**Root Cause:** 7speaking extraction returned object without `debugLog` field, and code tried to access `extractedQuestion.options.length` and `extractedQuestion.debugLog.length` without optional chaining
+**Fixes:**
+- Changed `extractedQuestion?.options.length` to `extractedQuestion?.options?.length`
+- Changed `extractedQuestion?.debugLog.length` to `extractedQuestion?.debugLog?.length`
+- Added missing fields to 7speaking extraction response:
+  - `strategy: "7speaking"`
+  - `extractedAt: new Date().toISOString()`
+  - `debugLog: ["[7speaking] Extracted X options"]`
 
 ## Final Configuration
 
