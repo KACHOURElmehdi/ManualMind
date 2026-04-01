@@ -55,6 +55,12 @@ export type ExtensionRequest =
         debugMode?: boolean;
         autoValidate?: boolean;
       };
+    }
+  | {
+      type: "SET_AUTO_ANSWER";
+      payload?: {
+        enabled?: boolean;
+      };
     };
 
 export type ErrorCode =
@@ -97,7 +103,8 @@ const REQUEST_TYPES = new Set<ExtensionRequest["type"]>([
   "SET_SETTINGS",
   "SELECT_ANSWER",
   "CLICK_VALIDATE",
-  "ANALYZE_AND_SELECT"
+  "ANALYZE_AND_SELECT",
+  "SET_AUTO_ANSWER"
 ]);
 
 function isObject(value: unknown): value is Record<string, unknown> {
