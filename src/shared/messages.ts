@@ -37,6 +37,24 @@ export type ExtensionRequest =
       payload: {
         settings: Partial<ExtensionSettings>;
       };
+    }
+  | {
+      type: "SELECT_ANSWER";
+      payload: {
+        answerId: string;
+        autoValidate?: boolean;
+      };
+    }
+  | {
+      type: "CLICK_VALIDATE";
+    }
+  | {
+      type: "ANALYZE_AND_SELECT";
+      payload?: {
+        parserMode?: ParserMode;
+        debugMode?: boolean;
+        autoValidate?: boolean;
+      };
     };
 
 export type ErrorCode =
@@ -46,7 +64,13 @@ export type ErrorCode =
   | "PARSER_EMPTY"
   | "PROVIDER_ERROR"
   | "STORAGE_ERROR"
-  | "UNKNOWN_ERROR";
+  | "UNKNOWN_ERROR"
+  | "NO_QUESTION"
+  | "SELECTION_FAILED"
+  | "SELECTION_ERROR"
+  | "NO_VALIDATE_BUTTON"
+  | "VALIDATE_ERROR"
+  | "NO_RESPONSE";
 
 export interface ExtensionError {
   code: ErrorCode;
@@ -70,7 +94,10 @@ const REQUEST_TYPES = new Set<ExtensionRequest["type"]>([
   "TRANSCRIBE_AUDIO_BLOB",
   "ANALYZE_TRANSCRIPT",
   "GET_SETTINGS",
-  "SET_SETTINGS"
+  "SET_SETTINGS",
+  "SELECT_ANSWER",
+  "CLICK_VALIDATE",
+  "ANALYZE_AND_SELECT"
 ]);
 
 function isObject(value: unknown): value is Record<string, unknown> {

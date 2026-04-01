@@ -22,6 +22,12 @@ function timestamped(message: string): string {
   return `[${new Date().toLocaleTimeString()}] ${message}`;
 }
 
+interface AnalyzeAndSelectResponse {
+  extracted: ExtractedQuestion;
+  analysis: AnalysisResult;
+  selection: { ok: boolean; data?: { selected: boolean; answerId: string } };
+}
+
 export function App() {
   const [settings, setSettings] = useState<ExtensionSettings>(DEFAULT_SETTINGS);
   const [enabledSitesInput, setEnabledSitesInput] = useState(DEFAULT_SETTINGS.enabledSites.join(", "));
@@ -33,6 +39,7 @@ export function App() {
   const [textAnalysis, setTextAnalysis] = useState<AnalysisResult | null>(null);
   const [transcriptResult, setTranscriptResult] = useState<TranscriptResult | null>(null);
   const [transcriptAnalysis, setTranscriptAnalysis] = useState<AnalysisResult | null>(null);
+  const [autoValidate, setAutoValidate] = useState(false);
 
   const latestAnalysis = useMemo(() => transcriptAnalysis ?? textAnalysis, [textAnalysis, transcriptAnalysis]);
 
@@ -217,6 +224,107 @@ export function App() {
     setLogs([]);
   };
 
+  const handleAutoAnswer = async (): Promise<void> => {
+    setIsBusy(true);
+    setError(null);
+    addLog("Starting auto-answer flow: Extract → Analyze → Select");
+
+    try {
+      const response = await sendRuntimeRequest<AnalyzeAndSelectResponse>({
+        type: "ANALYZE_AND_SELECT",
+        payload: {
+          parserMode: settings.preferredParserMode,
+          debugMode: settings.debugMode,
+          autoValidate
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(response));
+      }
+
+      const { extracted, analysis, selection } = response.data;
+
+      setExtractedQuestion(extracted);
+      setTextAnalysis(analysis);
+      setTranscriptResult(null);
+      setTranscriptAnalysis(null);
+
+      addLog(`Question: "${extracted.questionText.substring(0, 50)}..."`);
+      addLog(`AI suggested: ${analysis.suggestedAnswer} (${formatConfidence(analysis.confidence)})`);
+      
+      if (selection.ok) {
+        addLog(`✅ Answer "${analysis.suggestedAnswer}" selected on page!`);
+        if (autoValidate) {
+          addLog("✅ Auto-validation triggered!");
+        }
+      } else {
+        addLog("⚠️ Selection may have failed - check the page.");
+      }
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error ? requestError.message : "Failed to auto-answer.";
+      setError(message);
+      addLog(`Auto-answer error: ${message}`);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleSelectAnswer = async (answerId: string): Promise<void> => {
+    setIsBusy(true);
+    setError(null);
+    addLog(`Selecting answer: ${answerId}`);
+
+    try {
+      const response = await sendRuntimeRequest<{ selected: boolean; answerId: string }>({
+        type: "SELECT_ANSWER",
+        payload: { answerId, autoValidate }
+      });
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(response));
+      }
+
+      addLog(`✅ Answer "${answerId}" selected!`);
+      if (autoValidate) {
+        addLog("✅ Auto-validation triggered!");
+      }
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error ? requestError.message : "Failed to select answer.";
+      setError(message);
+      addLog(`Selection error: ${message}`);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
+  const handleValidate = async (): Promise<void> => {
+    setIsBusy(true);
+    setError(null);
+    addLog("Clicking validate button...");
+
+    try {
+      const response = await sendRuntimeRequest<{ validated: boolean }>({
+        type: "CLICK_VALIDATE"
+      });
+
+      if (!response.ok) {
+        throw new Error(getErrorMessage(response));
+      }
+
+      addLog("✅ Validate button clicked!");
+    } catch (requestError) {
+      const message =
+        requestError instanceof Error ? requestError.message : "Failed to validate.";
+      setError(message);
+      addLog(`Validation error: ${message}`);
+    } finally {
+      setIsBusy(false);
+    }
+  };
+
   const handleParserModeChange = async (value: ExtensionSettings["preferredParserMode"]): Promise<void> => {
     setError(null);
     try {
@@ -291,11 +399,32 @@ export function App() {
       <header className="panel-header">
         <div>
           <h1>Study Assistant</h1>
-          <p>Manual review only. No auto-answering behavior is implemented.</p>
+          <p>7speaking.com quiz helper with AI-powered answer suggestions.</p>
         </div>
       </header>
 
+      <section className="controls-card auto-answer-section">
+        <h2>🎯 Auto-Answer (7speaking)</h2>
+        <p className="description">Extract question, analyze with AI, and auto-select the best answer.</p>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={autoValidate}
+            onChange={(event) => setAutoValidate(event.target.checked)}
+          />
+          <span>Auto-validate after selection</span>
+        </label>
+        <button 
+          className="primary-button" 
+          onClick={handleAutoAnswer} 
+          disabled={isBusy || isRecording}
+        >
+          🚀 Auto-Answer Question
+        </button>
+      </section>
+
       <section className="controls-card">
+        <h2>Manual Controls</h2>
         <div className="button-grid">
           <button onClick={handleAnalyzeQuestion} disabled={isBusy || isRecording}>
             Analyze page question
@@ -381,13 +510,25 @@ export function App() {
       <section className="result-card">
         <h2>Extracted options</h2>
         {extractedQuestion?.options.length ? (
-          <ul>
-            {extractedQuestion.options.map((option) => (
-              <li key={option.id}>
-                <strong>{option.id.toUpperCase()}.</strong> {option.text}
-              </li>
-            ))}
-          </ul>
+          <>
+            <ul className="options-list">
+              {extractedQuestion.options.map((option) => (
+                <li key={option.id} className="option-item">
+                  <button 
+                    className={`option-button ${latestAnalysis?.suggestedAnswer === option.id ? 'suggested' : ''}`}
+                    onClick={() => handleSelectAnswer(option.id)}
+                    disabled={isBusy}
+                  >
+                    <strong>{option.id.toUpperCase()}.</strong> {option.text}
+                    {latestAnalysis?.suggestedAnswer === option.id && <span className="badge">AI Pick</span>}
+                  </button>
+                </li>
+              ))}
+            </ul>
+            <button className="validate-button" onClick={handleValidate} disabled={isBusy}>
+              ✓ Validate Answer
+            </button>
+          </>
         ) : (
           <p>No options extracted.</p>
         )}

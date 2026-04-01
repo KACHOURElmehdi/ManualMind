@@ -179,6 +179,104 @@ async function handleMessage(message: unknown): Promise<MessageResponse<unknown>
           return providerErrorResponse(error, "Transcript analysis request failed.");
         }
       }
+      case "SELECT_ANSWER":
+      case "CLICK_VALIDATE": {
+        // Forward these messages to content script
+        let activeTab: ActiveTabContext;
+        try {
+          activeTab = await getActiveTabContext();
+        } catch (error) {
+          const details = error instanceof Error ? error.message : "Unable to resolve active tab.";
+          return errorResponse("NO_ACTIVE_TAB", "No active tab available.", details);
+        }
+
+        return new Promise((resolve) => {
+          chrome.tabs.sendMessage(activeTab.id, message, (response) => {
+            if (chrome.runtime.lastError) {
+              resolve(errorResponse("CONTENT_UNAVAILABLE", chrome.runtime.lastError.message ?? "Failed to reach content script."));
+              return;
+            }
+            resolve(response ?? errorResponse("NO_RESPONSE", "No response from content script."));
+          });
+        });
+      }
+      case "ANALYZE_AND_SELECT": {
+        // Combined flow: Extract → Analyze → Select
+        let activeTab: ActiveTabContext;
+        try {
+          activeTab = await getActiveTabContext();
+        } catch (error) {
+          const details = error instanceof Error ? error.message : "Unable to resolve active tab.";
+          return errorResponse("NO_ACTIVE_TAB", "No active tab available.", details);
+        }
+
+        const settings = await getSettings();
+        if (activeTab.url && !isUrlAllowed(activeTab.url, settings.enabledSites)) {
+          return errorResponse("BAD_REQUEST", "Site not in enabled list.", activeTab.url);
+        }
+
+        // Step 1: Extract question
+        const extractionResponse = await sendExtractionRequestToTab(activeTab.id, message.payload);
+        if (!extractionResponse.ok) {
+          return extractionResponse;
+        }
+
+        const extracted = extractionResponse.data as {
+          questionText: string;
+          options: { id: string; text: string }[];
+          contextText: string;
+          rawText: string;
+        };
+
+        // Step 2: Analyze with AI
+        const provider = getAnalysisProvider(settings.analysisProvider);
+        let analysisResult;
+        try {
+          analysisResult = await provider.analyzeTextQuestion({
+            questionText: extracted.questionText,
+            options: extracted.options,
+            contextText: extracted.contextText,
+            rawText: extracted.rawText
+          });
+        } catch (error) {
+          if (settings.fallbackToMockOnProviderError) {
+            const fallbackResponse = await runTextFallback(extracted, error);
+            if (!fallbackResponse.ok) {
+              return fallbackResponse;
+            }
+            analysisResult = fallbackResponse.data;
+          } else {
+            return providerErrorResponse(error, "Analysis failed.");
+          }
+        }
+
+        // Step 3: Select the answer
+        const selectResponse = await new Promise<MessageResponse<unknown>>((resolve) => {
+          chrome.tabs.sendMessage(
+            activeTab.id,
+            {
+              type: "SELECT_ANSWER",
+              payload: {
+                answerId: analysisResult.suggestedAnswer,
+                autoValidate: message.payload?.autoValidate ?? false
+              }
+            },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                resolve(errorResponse("SELECTION_FAILED", chrome.runtime.lastError.message ?? "Failed to select answer."));
+                return;
+              }
+              resolve(response ?? errorResponse("NO_RESPONSE", "No response from content script."));
+            }
+          );
+        });
+
+        return successResponse({
+          extracted,
+          analysis: analysisResult,
+          selection: selectResponse
+        });
+      }
       default:
         return errorResponse("BAD_REQUEST", "Unsupported request type.");
     }
