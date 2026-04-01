@@ -509,7 +509,7 @@ export function App() {
 
       <section className="result-card">
         <h2>Extracted options</h2>
-        {extractedQuestion?.options.length ? (
+        {extractedQuestion?.options?.length ? (
           <>
             <ul className="options-list">
               {extractedQuestion.options.map((option) => (
@@ -578,7 +578,7 @@ export function App() {
         <ul className="logs-list">
           {logs.length > 0 ? logs.map((entry) => <li key={entry}>{entry}</li>) : <li>No logs yet.</li>}
         </ul>
-        {extractedQuestion?.debugLog.length ? (
+        {extractedQuestion?.debugLog?.length ? (
           <>
             <h3>Parser debug</h3>
             <ul className="logs-list">

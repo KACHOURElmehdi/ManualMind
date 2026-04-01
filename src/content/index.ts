@@ -34,6 +34,9 @@ chrome.runtime.onMessage.addListener((rawMessage, _sender, sendResponse) => {
                 options: toStandardOptions(sevenSpeakingData.options),
                 contextText: "",
                 rawText: sevenSpeakingData.questionText,
+                strategy: "7speaking",
+                extractedAt: new Date().toISOString(),
+                debugLog: [`[7speaking] Extracted ${sevenSpeakingData.options.length} options`],
                 source: "7speaking",
                 hasValidateButton: !!sevenSpeakingData.validateButton
               })
