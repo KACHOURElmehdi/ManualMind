@@ -17,7 +17,7 @@
     }
   ],
   "action": {
-    "default_title": "Study Assistant"
+    "default_title": "Analyze Question"
   },
   "side_panel": {
     "default_path": "sidepanel.html"

@@ -97,7 +97,7 @@ function extractQuestionText(container: Element): string {
   }
 
   if (explicitCandidates.length > 0) {
-    return explicitCandidates[0];
+    return explicitCandidates[0] ?? "";
   }
 
   const rawText = getVisibleInnerText(container);

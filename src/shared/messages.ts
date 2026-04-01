@@ -91,12 +91,19 @@ export function errorResponse(
   message: string,
   details?: string
 ): MessageResponse<never> {
+  const error: ExtensionError = details
+    ? {
+        code,
+        message,
+        details
+      }
+    : {
+        code,
+        message
+      };
+
   return {
     ok: false,
-    error: {
-      code,
-      message,
-      details
-    }
+    error
   };
 }

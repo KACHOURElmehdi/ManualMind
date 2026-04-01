@@ -90,7 +90,15 @@ export class MockAnalysisProvider implements AnalysisProvider {
     }
 
     const sampleIndex = audioBlob.size % SAMPLE_AUDIO_TRANSCRIPTS.length;
-    const selected = SAMPLE_AUDIO_TRANSCRIPTS[sampleIndex];
+    const selected = SAMPLE_AUDIO_TRANSCRIPTS[sampleIndex] ?? SAMPLE_AUDIO_TRANSCRIPTS[0];
+    if (!selected) {
+      return {
+        transcript: "",
+        confidence: 0,
+        language: "und",
+        debugNotes: "No mock transcript samples are configured."
+      };
+    }
     const confidence = clamp(0.56 + Math.min(audioBlob.size / 250_000, 0.32), 0.56, 0.88);
 
     return {

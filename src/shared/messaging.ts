@@ -8,10 +8,15 @@ export async function sendRuntimeRequest<TResponse>(
   request: ExtensionRequest
 ): Promise<MessageResponse<TResponse>> {
   return new Promise((resolve, reject) => {
-    chrome.runtime.sendMessage(request, (response: MessageResponse<TResponse>) => {
+    chrome.runtime.sendMessage(request, (response: MessageResponse<TResponse> | undefined) => {
       const runtimeError = getRuntimeErrorMessage();
       if (runtimeError) {
         reject(new Error(runtimeError));
+        return;
+      }
+
+      if (!response) {
+        reject(new Error("No runtime response received from extension service worker."));
         return;
       }
 
@@ -25,10 +30,15 @@ export async function sendTabRequest<TResponse>(
   request: ExtensionRequest
 ): Promise<MessageResponse<TResponse>> {
   return new Promise((resolve, reject) => {
-    chrome.tabs.sendMessage(tabId, request, (response: MessageResponse<TResponse>) => {
+    chrome.tabs.sendMessage(tabId, request, (response: MessageResponse<TResponse> | undefined) => {
       const runtimeError = getRuntimeErrorMessage();
       if (runtimeError) {
         reject(new Error(runtimeError));
+        return;
+      }
+
+      if (!response) {
+        reject(new Error("No response received from content script."));
         return;
       }
 
